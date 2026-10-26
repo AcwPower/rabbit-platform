@@ -1,0 +1,22 @@
+[Unit]
+Description=Rabbit Party API
+After=network.target mysql.service
+Requires=mysql.service
+[Service]
+User=rabbit
+Group=rabbit
+WorkingDirectory=/opt/rabbit-platform/current/backend
+EnvironmentFile=/etc/rabbit/app.env
+ExecStart=/opt/rabbit-platform/current/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8101 --workers 2 --proxy-headers --forwarded-allow-ips=127.0.0.1 --no-access-log
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/rabbit
+MemoryMax=768M
+CPUQuota=150%
+UMask=0077
+[Install]
+WantedBy=multi-user.target

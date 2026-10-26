@@ -1,0 +1,6 @@
+<script setup>
+import {BellRing,ArrowRight,X,AlarmClock,TriangleAlert} from 'lucide-vue-next'
+defineProps({notice:Object,total:Number})
+defineEmits(['open','dismiss','ignore'])
+</script>
+<template><aside v-if="notice" :class="['application-notice',notice.item.severity]" role="status" aria-live="polite" aria-atomic="true"><span class="notice-symbol"><TriangleAlert v-if="notice.item.severity==='danger'" :size="21"/><AlarmClock v-else-if="notice.item.kind==='booking_reminder'" :size="21"/><BellRing v-else :size="21"/></span><div class="application-notice-copy"><strong>{{['progress','booking_reminder'].includes(notice.item.kind)?notice.item.label:notice.initial?'你有待处理的申请':'收到新的'+notice.item.label}} <span>{{total}} 条消息</span></strong><p>{{notice.item.game_id}}{{notice.item.map_name?' · '+notice.item.map_name:''}}</p><p v-if="notice.item.message" class="notice-message">{{notice.item.message}}</p></div><button class="button primary small" @click="$emit('open',notice.item)">{{notice.item.kind==='booking_reminder'?'查看老板安排':'查看详情'}}<ArrowRight :size="14"/></button><button v-if="notice.item.kind==='booking_reminder'" class="button small notice-ignore" @click="$emit('ignore',notice.item)">忽略提醒</button><button class="icon-button notice-close" aria-label="收起消息通知" @click="$emit('dismiss')"><X :size="17"/></button></aside></template>

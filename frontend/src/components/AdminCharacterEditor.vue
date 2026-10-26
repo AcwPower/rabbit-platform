@@ -1,0 +1,10 @@
+<script setup>
+import {ref} from 'vue'
+import {api} from '../api'
+const props=defineProps({userId:Number})
+const open=ref(false),rows=ref([]),selected=ref(null),form=ref({name:'',level:1,job:'',reason:''}),busy=ref(false),error=ref(''),done=ref(false)
+async function load(){try{rows.value=await api(`/admin/users/${props.userId}/characters`);open.value=true;if(rows.value[0])choose(rows.value[0].id)}catch(e){error.value=e.message}}
+function choose(id){selected.value=id;const row=rows.value.find(r=>r.id===id);form.value={name:row.name,level:row.level,job:row.job,reason:''};done.value=false}
+async function submit(){busy.value=true;error.value='';try{await api(`/admin/users/${props.userId}/characters/${selected.value}`,{method:'PUT',data:form.value});await load();done.value=true}catch(e){error.value=e.message}finally{busy.value=false}}
+</script>
+<template><div class="admin-character-editor"><button v-if="!open" class="button small" @click="load">修改角色资料</button><form v-else class="stack confirm-box" @submit.prevent="submit"><strong>修改账号 #{{userId}} 的角色资料</strong><p class="hint">原始注册截图和识别结果保留，所有修改写入审计日志。</p><select v-if="rows.length>1" :value="selected" aria-label="选择要修改的角色" @change="choose(Number($event.target.value))"><option v-for="r in rows" :value="r.id">{{r.name}}</option></select><template v-if="rows.length"><div class="form-grid"><label>游戏 ID<input v-model="form.name" maxlength="40" required></label><label>等级<input v-model.number="form.level" type="number" min="1" max="300" required></label></div><label>职业<input v-model="form.job" maxlength="30"></label><label>审核依据<textarea v-model="form.reason" minlength="3" maxlength="350" required></textarea></label><div class="button-row"><button class="button primary small" :disabled="busy">保存角色资料</button><button type="button" class="button small" @click="open=false">关闭</button></div></template><p v-else class="hint">此账号没有已保存的角色资料。</p><p v-if="done" role="status" class="profile-success">角色资料已更新；请在举报与申诉中回复对应申请。</p></form><p v-if="error" class="error">{{error}}</p></div></template>

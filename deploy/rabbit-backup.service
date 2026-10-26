@@ -1,0 +1,7 @@
+[Unit]
+Description=Daily Rabbit database and configuration backup
+After=mysql.service
+[Service]
+Type=oneshot
+ExecStart=/opt/rabbit-platform/current/deploy/backup.sh
+UMask=0077

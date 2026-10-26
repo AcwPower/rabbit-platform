@@ -1,0 +1,9 @@
+[Unit]
+Description=Check Rabbit API and private HTTPS ingress
+After=network.target
+[Service]
+Type=oneshot
+ExecStart=/opt/rabbit-platform/current/deploy/health.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict

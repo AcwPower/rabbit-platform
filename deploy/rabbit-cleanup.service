@@ -1,0 +1,14 @@
+[Unit]
+Description=Expire Rabbit cards and remove expired private contacts
+After=mysql.service
+[Service]
+Type=oneshot
+User=rabbit
+Group=rabbit
+WorkingDirectory=/opt/rabbit-platform/current/backend
+EnvironmentFile=/etc/rabbit/app.env
+ExecStart=/opt/rabbit-platform/current/venv/bin/python -m app.maintenance
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
