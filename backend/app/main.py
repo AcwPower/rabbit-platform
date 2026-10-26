@@ -153,7 +153,8 @@ def delete_character(char_id:int,request:Request,db=Depends(get_db)):
 @app.get('/api/{kind}-cards')
 def list_cards(kind:Literal['team','boss'],q:str=Query('',max_length=80),map_name:str='',level:int|None=None,
         flower:str='',capacity:int|None=None,price_mode:str='',exp_min:int|None=None,exp_max:int|None=None,
-        at_time:str='',available:bool=False,page:int=Query(1,ge=1),db=Depends(get_db)):
+        at_time:str='',available:bool=False,sort:Literal['availability','latest']='availability',
+        page:int=Query(1,ge=1),db=Depends(get_db)):
     model=card_class(kind)
     conditions=[model.status=='active',model.expires_at>now()]
     if q: conditions.append(or_(model.map_name.contains(q,autoescape=True),model.game_id.contains(q,autoescape=True)))
@@ -175,8 +176,24 @@ def list_cards(kind:Literal['team','boss'],q:str=Query('',max_length=80),map_nam
             (model.start_time>=model.end_time)&or_(model.start_time<=at_time,model.end_time>=at_time)))
     if available and kind=='team':conditions.append(model.capacity>model.fighter_count+model.priest_count+model.confirmed_boss_count+case((model.teammate_need!='none',1),else_=0))
     total=db.scalar(select(func.count(model.id)).where(*conditions))
-    rows=db.scalars(select(model).where(*conditions).order_by(model.created_at.desc(),model.id.desc()).offset((page-1)*20).limit(20)).all()
-    return {'items':[card_dict(c,kind) for c in rows],'total':total,'page':page,'has_more':page*20<total}
+    query=select(model).where(*conditions)
+    if kind=='team' and sort=='availability':
+        # A scheduled end is only an estimate; overdue matches never free seats
+        # automatically or jump to the front of the queue.
+        next_end=select(Match.team_id,func.min(Match.expected_end_at).label('ends_at')).where(
+            Match.status.in_(['boarded','disputed']),Match.boarded_at.is_not(None),
+            Match.finished_at.is_(None),Match.expected_end_at>now()
+        ).group_by(Match.team_id).subquery()
+        free=model.capacity-model.fighter_count-model.priest_count-model.confirmed_boss_count-case((model.teammate_need!='none',1),else_=0)
+        query=query.outerjoin(next_end,next_end.c.team_id==model.id).order_by(
+            case((free>0,0),(next_end.c.ends_at.is_not(None),1),else_=2),
+            case((free<=0,next_end.c.ends_at),else_=None))
+    rows=db.scalars(query.order_by(model.created_at.desc(),model.id.desc()).offset((page-1)*20).limit(20)).all()
+    progress=public_boss_progress(db,[c.id for c in rows]) if kind=='team' else {}
+    items=[card_dict(c,kind) for c in rows]
+    if kind=='team':
+        for item in items:item['boss_progress']=progress[item['id']]
+    return {'items':items,'total':total,'page':page,'has_more':page*20<total}
 
 @app.get('/api/{kind}-cards/{card_id}')
 def card_detail(kind:Literal['team','boss'],card_id:int,request:Request,db=Depends(get_db)):
@@ -184,6 +201,7 @@ def card_detail(kind:Literal['team','boss'],card_id:int,request:Request,db=Depen
     owner=owns(request,db,card)
     if card.status=='hidden' and not owner: fail('NOT_FOUND','此卡片已被隐藏',404)
     result=card_dict(card,kind,db,True); result['is_owner']=owner
+    if kind=='team':result['boss_progress']=public_boss_progress(db,[card.id])[card.id]
     if owner:
         result['contact']=read_contact(db,kind,card.id)
         condition=Application.team_card_id==card_id if kind=='team' else Application.boss_card_id==card_id

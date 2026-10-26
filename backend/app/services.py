@@ -45,6 +45,21 @@ def ensure_boss_claimable(db, card):
 def iso(value):
     return value.isoformat()+'Z' if value else None
 
+def public_boss_progress(db, team_ids):
+    """Load anonymous, currently occupied boss seats in one query per page."""
+    result = {team_id: [] for team_id in team_ids}
+    if not result:
+        return result
+    rows = db.execute(select(Match.team_id, Match.boarded_at, Match.expected_end_at).where(
+        Match.team_id.in_(result), Match.status.in_(['boarded', 'disputed']),
+        Match.boarded_at.is_not(None), Match.finished_at.is_(None)
+    ).order_by(Match.team_id, Match.id)).all()
+    for row in rows:
+        members = result[row.team_id]
+        members.append({'number': len(members) + 1, 'boarded_at': iso(row.boarded_at),
+                        'expected_end_at': iso(row.expected_end_at)})
+    return result
+
 def card_dict(card, kind, db=None, detail=False):
     fields = ['id','game_id','level','map_name','capacity','flower','price_mode','price_currency','price',
               'night_price','exp_min','exp_max','start_time','end_time','notes','version']
